@@ -6,6 +6,7 @@ use PhpSchool\CliMenu\Action\ExitAction;
 use PhpSchool\CliMenu\Builder\CliMenuBuilder;
 use PhpSchool\CliMenu\CliMenu;
 use PhpSchool\CliMenu\MenuItem\SelectableItem;
+use PhpSchool\CliMenu\MenuStyle;
 
 abstract class AbstractFieldTypeConfigurator implements FieldTypeConfiguratorInterface
 {
@@ -30,9 +31,14 @@ abstract class AbstractFieldTypeConfigurator implements FieldTypeConfiguratorInt
     protected function getTypeSettingsMenu(): CliMenu
     {
         return (new CliMenuBuilder())
+            ->setBackgroundColour('blue')
+            ->setForegroundColour('black')
             ->disableDefaultItems()
             ->addItem('Add instructions', function (CliMenu $menu) {
-                $this->instructions = $menu->askText()
+                $style = (new MenuStyle());
+                $style->setBg('yellow');
+                $style->setFg('black');
+                $this->instructions = $menu->askText($style)
                     ->setPromptText('Instructions: ')
                     ->ask()
                     ->fetch();
