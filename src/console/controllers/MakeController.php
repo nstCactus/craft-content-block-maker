@@ -3,12 +3,10 @@
 namespace modules\maker\console\controllers;
 
 use craft\console\Controller;
-use craft\fields\Lightswitch;
-use craft\fields\PlainText;
 use craft\helpers\Console;
-use modules\maker\console\events\DefineSupportedFieldTypesEvent;
-use modules\maker\fields\configurators\BaseFieldTypeConfigurator;
+use modules\maker\events\DefineSupportedFieldTypesEvent;
 use modules\maker\fields\configurators\FieldTypeConfiguratorInterface;
+use modules\maker\fields\configurators\ImageFieldTypeConfigurator;
 use modules\maker\fields\configurators\LightswitchFieldTypeConfigurator;
 use modules\maker\fields\configurators\PlainTextFieldTypeConfigurator;
 use PhpSchool\CliMenu\Builder\CliMenuBuilder;
@@ -99,29 +97,17 @@ class MakeController extends Controller
         $menuBuilder->build()->open();
         Console::output("Type of the field? $fieldTypeName");
 
-        return $this->configureField($fieldName, $fieldHandle, $fieldTypeClass);
+        return $this->getFieldTypeSpecificConfig($fieldName, $fieldHandle, $fieldTypeClass);
     }
 
     protected function getFieldTypeOptions(): array
     {
         $options = [];
-        foreach(\Craft::$app->getFields()->getAllFieldTypes() as $fieldClass) {
+        foreach($this->supportedFieldTypes() as $fieldClass) {
             $options[$fieldClass] = call_user_func([$fieldClass, 'displayName']);
         }
 
         return $options;
-    }
-
-    protected function configureField(string $fieldName, string $fieldHandle, string $fieldType): array
-    {
-        $typeSpecificConfig = $this->getFieldTypeSpecificConfig($fieldType);
-
-        return array_merge([
-            'name' => $fieldName,
-            'handle' => $fieldHandle,
-            'type' => $fieldType,
-
-        ], $typeSpecificConfig);
     }
 
     /**
@@ -137,13 +123,14 @@ class MakeController extends Controller
     protected function defineSupportedFieldTypes(): array
     {
         return [
-            PlainText::class => PlainTextFieldTypeConfigurator::class,
-            Lightswitch::class => LightswitchFieldTypeConfigurator::class,
+            ImageFieldTypeConfigurator::class,
+            PlainTextFieldTypeConfigurator::class,
+            LightswitchFieldTypeConfigurator::class,
         ];
     }
 
     /**
-     * Return an associative array that maps field types' FQCN to a class that implements FieldTypeConfiguratorInterface
+     * Return an array of FQCN of classes that implement FieldTypeConfiguratorInterface
      *
      * @return array
      */
@@ -159,14 +146,15 @@ class MakeController extends Controller
         return $event->supportedFieldTypes;
     }
 
-    protected function getFieldTypeSpecificConfig(string $fieldType): array
+    protected function getFieldTypeSpecificConfig(string $name, string $handle, string $className): array
     {
-        $supportedFieldTypes = $this->supportedFieldTypes();
-        $fieldTypeConfiguratorClassName = $supportedFieldTypes[$fieldType] ?? BaseFieldTypeConfigurator::class;
-
         /** @var FieldTypeConfiguratorInterface $fieldTypeConfigurator */
-        $fieldTypeConfigurator = new $fieldTypeConfiguratorClassName;
+        $fieldTypeConfigurator = new $className;
 
-        return $fieldTypeConfigurator->getTypeSettings();
+        return array_merge([
+            'name' => $name,
+            'handle' => $handle,
+            'type' => $className,
+        ], $fieldTypeConfigurator->getTypeSettings($name, $handle));
     }
 }

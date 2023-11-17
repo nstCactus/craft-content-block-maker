@@ -1,6 +1,6 @@
 <?php
 
-namespace modules\maker\console\events;
+namespace modules\maker\events;
 
 use craft\base\Event;
 
