@@ -20,11 +20,10 @@ abstract class AbstractFieldTypeConfigurator implements FieldTypeConfiguratorInt
         $menu->open();
 
         return [
-            'required' => $this->isRequired,
             'instructions' => $this->instructions,
-            'searchable' => true,
-            'translationMethod' => 'none',
-            'typeSettings' => [],
+            'required' => $this->isRequired ? '1' : '',
+            'searchable' => '1',
+            'typesettings' => [],
         ];
     }
 

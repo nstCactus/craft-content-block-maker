@@ -10,7 +10,7 @@ class ImageFieldTypeConfigurator extends AbstractAssetFieldTypeConfigurator
     {
         return array_replace_recursive(parent::getTypeSettings($name, $handle), [
             'type' => Assets::class,
-            'typeSettings' => [
+            'typesettings' => [
                 "restrictLocation" => false,
                 "defaultUploadLocationSource" => "volume =>7835ccc0-93f4-46bd-a0f3-1d8e67b9d5c0", // TODO: select this
                 "defaultUploadLocationSubpath" => "hero-home\/desktop", // TODO: ask this
@@ -35,5 +35,10 @@ class ImageFieldTypeConfigurator extends AbstractAssetFieldTypeConfigurator
     public static function displayName(): string
     {
         return 'Image';
+    }
+
+    public static function fieldClassName(): string
+    {
+        return Assets::class;
     }
 }

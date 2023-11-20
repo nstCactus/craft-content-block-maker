@@ -2,7 +2,9 @@
 
 namespace modules\maker\console\controllers;
 
+use Craft;
 use craft\console\Controller;
+use craft\fieldlayoutelements\CustomField;
 use craft\helpers\Console as CraftConsole;
 use modules\maker\events\DefineSupportedFieldTypesEvent;
 use modules\maker\fields\configurators\FieldTypeConfiguratorInterface;
@@ -10,9 +12,11 @@ use modules\maker\fields\configurators\ImageFieldTypeConfigurator;
 use modules\maker\fields\configurators\LightswitchFieldTypeConfigurator;
 use modules\maker\fields\configurators\PlainTextFieldTypeConfigurator;
 use modules\maker\helpers\Console;
+use modules\maker\MakerModule;
 use PhpSchool\CliMenu\Builder\CliMenuBuilder;
 use PhpSchool\CliMenu\CliMenu;
 use verbb\supertable\fields\SuperTableField;
+use yii\console\ExitCode;
 use yii\helpers\Inflector;
 
 /**
@@ -22,15 +26,29 @@ use yii\helpers\Inflector;
 class MakeController extends Controller
 {
     public const EVENT_DEFINE_SUPPORTED_FIELD_TYPES = 'supportedFieldTypes';
+    public const DEFAULT_FIELD_GROUP_NAME = 'CMS blocks';
+    public const NEO_FIELD_HANDLE = 'contentBuildersMain';
 
-    public function actionCmsBlock() {
+    /**
+     * TODO: Make field group name configurable
+     * TODO: Make Neo field handle configurable
+     * TODO: Move most of this to a service; handle errors using exceptions
+     */
+    public function actionCmsBlock(): int
+    {
+        $fieldsService = Craft::$app->getFields();
+
+        $cmsBlocksService = MakerModule::getInstance()->getCmsBlocks();
+        $group = $cmsBlocksService->ensureFieldsGroupExists(self::DEFAULT_FIELD_GROUP_NAME);
+
+        // TODO: check if block already exists
         $blockName = Console::prompt('Name of the block?', [ 'required' => true ]);
         $blockHandle = Console::prompt("Handle of the block?", [
             'default' => lcfirst(Inflector::camelize($blockName)),
         ]);
 
         $fields = [];
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 1; $i < 100; $i++) {
             Console::output("");
             if ($i === 0) {
                 Console::outputSuccess("Great, let's add fields!");
@@ -44,28 +62,60 @@ class MakeController extends Controller
                 break;
             }
 
-            $fields[] = $field;
+            $fields["new$i"] = $field;
         }
 
-        \Craft::dd([
-            'name' => $blockName,
-            'handle' => $blockHandle,
-            'instructions' => '',
-            'required' => false,
-            'searchable' => 1,
-            "translationMethod" => "site",
+        $superTableField = $fieldsService->createField([
+            'id' => null,
             'type' => SuperTableField::class,
+            'groupId' => $group->id,
+            'name' => $blockName,
+            'handle' => 'block' . ucfirst($blockHandle),
+            'instructions' => '',
+            'searchable' => true,
+            'translationMethod' => 'none',
+            'translationKeyFormat' => null,
             'settings' => [
-                'propagationMethod' => 'all',
-                'staticField' => true,
-                'fieldLayout'=> 'row',
+                'fieldLayout' => 'row',
+                "selectionLabel" => "",
+                "minRows" => "",
+                "maxRows" => "",
+                'staticField' => '1',
                 'blockTypes' => [
-                    'new1' => [
+                    'new' => [
                         'fields' => $fields,
                     ],
                 ],
             ],
         ]);
+        if (!$fieldsService->saveField($superTableField)) {
+            Console::outputWarning(implode(', ', $superTableField->getFirstErrors()));
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        if (!$cmsBlocksService->addNeoBlockType(self::NEO_FIELD_HANDLE, $blockHandle, $blockName, [
+            [
+                'name' => 'Content',
+                'elements' => [
+                    [
+                        'type' => CustomField::class,
+                        'fieldUid' => $superTableField->uid,
+                    ],
+                ],
+            ],
+        ])) {
+            Console::outputWarning(implode(', ', $superTableField->getFirstErrors()));
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        if (!$cmsBlocksService->createTemplates($superTableField)) {
+            Console::outputWarning(implode(', ', $superTableField->getFirstErrors()));
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        Console::output("");
+        Console::outputSuccess('Done!');
+        return ExitCode::OK;
     }
 
     protected function addField($existingFields): ?array
@@ -91,7 +141,7 @@ class MakeController extends Controller
         $supportedFieldTypes = $this->supportedFieldTypes();
         foreach ($supportedFieldTypes as $className) {
             $label = $className::displayName();
-            $menuBuilder->addItem($label, function(CliMenu $menu) use (&$fieldTypeClass, &$fieldTypeName, $className, $label) {
+            $menuBuilder->addItem($label, function (CliMenu $menu) use (&$fieldTypeClass, &$fieldTypeName, $className, $label) {
                 $fieldTypeClass = $className;
                 $fieldTypeName = $label;
                 $menu->close();
@@ -140,6 +190,12 @@ class MakeController extends Controller
         return $event->supportedFieldTypes;
     }
 
+    /**
+     * @param string $name
+     * @param string $handle
+     * @param class-string<FieldTypeConfiguratorInterface> $className
+     * @return array
+     */
     protected function getFieldTypeSpecificConfig(string $name, string $handle, string $className): array
     {
         /** @var FieldTypeConfiguratorInterface $fieldTypeConfigurator */
@@ -148,7 +204,7 @@ class MakeController extends Controller
         return array_merge([
             'name' => $name,
             'handle' => $handle,
-            'type' => $className,
+            'type' => $className::fieldClassName(),
         ], $fieldTypeConfigurator->getTypeSettings($name, $handle));
     }
 

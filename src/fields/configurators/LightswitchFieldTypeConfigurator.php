@@ -2,6 +2,7 @@
 
 namespace modules\maker\fields\configurators;
 
+use craft\fields\Lightswitch;
 use PhpSchool\CliMenu\CliMenu;
 use PhpSchool\CliMenu\MenuItem\CheckboxItem;
 
@@ -14,7 +15,7 @@ class LightswitchFieldTypeConfigurator extends AbstractFieldTypeConfigurator
         return array_replace_recursive(parent::getTypeSettings($name, $handle), [
             'required' => false,
             'searchable' => false,
-            'typeSettings' => [
+            'typesettings' => [
                 'value' => $this->isCheckedByDefault,
             ],
         ]);
@@ -35,5 +36,10 @@ class LightswitchFieldTypeConfigurator extends AbstractFieldTypeConfigurator
     public static function displayName(): string
     {
         return 'Lightswitch';
+    }
+
+    public static function fieldClassName(): string
+    {
+        return Lightswitch::class;
     }
 }
